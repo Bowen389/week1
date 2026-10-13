@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "initial_capital": "100000.00",
+  "cash": "100000.00",
+  "positions": {},
+  "plans": [],
+  "trades": [],
+  "processed_days": [
+    "2026-10-13"
+  ],
+  "scanned_weeks": {},
+  "outbox": []
+}

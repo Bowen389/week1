@@ -1,0 +1,77 @@
+name: W1 周线买点与10万元模拟仓
+on:
+  schedule:
+    # UTC，北京时间17:20主任务，20:20失败补跑；每天触发，由交易日历过滤。
+    - cron: '20 9 * * *'
+    - cron: '20 12 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['src/**', 'tests/**', 'requirements.txt', '.github/workflows/**']
+permissions:
+  contents: write
+concurrency:
+  group: w1-paper-ledger
+  cancel-in-progress: false
+jobs:
+  daily:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Rule and ledger tests
+        run: python -m unittest discover -s tests -v
+      - name: Public-source health check
+        run: python -m src.run health
+      - name: Generate weekly signal and settle paper account
+        id: engine
+        continue-on-error: true
+        run: python -m src.run run
+      - name: Commit ledger and reports before notifications
+        id: persist
+        if: always() && steps.engine.outcome != 'skipped'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data reports
+          if ! git diff --cached --quiet; then
+            git commit -m 'Update W1 signals and paper ledger [skip ci]'
+            git push origin HEAD:main
+          fi
+      - name: Send configured notifications
+        id: notify
+        if: always() && steps.persist.outcome == 'success'
+        continue-on-error: true
+        env:
+          SERVERCHAN_SENDKEY: ${{ secrets.SERVERCHAN_SENDKEY }}
+          SENDKEY: ${{ secrets.SENDKEY }}
+        run: python -m src.run notify
+      - name: Save notification delivery status
+        if: always() && steps.notify.outcome == 'success'
+        run: |
+          git add data/state.json
+          if ! git diff --cached --quiet; then
+            git commit -m 'Record W1 notification delivery [skip ci]'
+            git push origin HEAD:main
+          fi
+      - name: Preserve run files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: w1-run-${{ github.run_id }}
+          path: |
+            data/state.json
+            reports/
+          retention-days: 90
+      - name: Fail run when engine or notification failed
+        if: always() && (steps.engine.outcome == 'failure' || steps.notify.outcome == 'failure')
+        run: exit 1
