@@ -6,7 +6,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
 from zoneinfo import ZoneInfo
-from . import data, market_cache
+from . import data, market_cache, valuation
 from .strategy import new_state, signal, monday, next_session, execute_day, money
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -77,6 +77,11 @@ def collect_signals(state,today,sessions,messages,market=None):
         if cap>250:excluded['总市值超250亿']+=1;continue
         eligible.append(code)
     before=len(eligible)
+    previous=max(x for x in sessions if x<monday(today))
+    cache=state.setdefault('market_closes',{})
+    if str(previous) not in cache:
+        baseline=valuation.day_snapshot(previous)
+        cache[str(previous)]={c:str(row['CLOSE_PRICE']) for c,row in baseline.items() if row['CLOSE_PRICE'] is not None and Decimal(str(row['CLOSE_PRICE']))>0}
     eligible,growth_counts=market_cache.price_candidates(eligible,q,ranks,today,sessions,state.setdefault('market_closes',{}))
     messages.append(f'周涨幅前筛：市值/ST过滤后{before}只，需历史核验{len(eligible)}只；缓存统计{growth_counts}')
     print(f'SCAN_START universe={len(codes)} eligible={len(eligible)} excluded={dict(excluded)} growth={growth_counts}',flush=True)

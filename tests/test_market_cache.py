@@ -10,11 +10,11 @@ class Cache(unittest.TestCase):
     def test_holiday_no_five_day_proxy(self):
         sessions=[date(2026,9,30),date(2026,10,8),date(2026,10,9)]
         selected,c=price_candidates(['a'],{'a':{'price':'11'}},{'a':{'zdf_d5':'-20'}},date(2026,10,9),sessions,{})
-        self.assertEqual(selected,['a']);self.assertEqual(c['bootstrap_5day'],0)
+        self.assertEqual(selected,['a']);self.assertEqual(c['missing'],1)
     def test_bootstrap_wide_bounds(self):
         d=date(2026,10,16);sessions=[date(2026,10,9)]+[date(2026,10,12)+timedelta(days=i) for i in range(5)]
         q={c:{'price':'10'} for c in ['a','b','c']};ranks={c:{'zdf_d5':v} for c,v in [('a','6.5'),('b','10.5'),('c','15')]}
-        self.assertEqual(price_candidates(list(q),q,ranks,d,sessions,{})[0],['a','b'])
+        self.assertEqual(price_candidates(list(q),q,ranks,d,sessions,{})[0],['a','b','c'])
     def test_remember_only_twenty_days(self):
         c={str(date(2026,8,1)+timedelta(days=i)):{'a':'10'} for i in range(25)}
         remember(c,date(2026,10,13),{'a':{'price':'11'}})

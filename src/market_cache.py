@@ -13,19 +13,12 @@ def price_candidates(codes,q,ranks,today,sessions,cache):
     previous=max(x for x in sessions if x<monday(today))
     saved=cache.get(str(previous),{})
     week_days=[x for x in sessions if monday(x)==monday(today) and x<=today]
-    result=[];counts={'cached':0,'bootstrap_5day':0,'missing':0,'growth_rejected':0}
-    # 无缓存首周：普通5交易日周可用腾讯5日涨幅粗筛；保留较宽边界，最终日线重新算精确7%-10%。
-    normal_week=len(week_days)==5
+    result=[];counts={'cached':0,'missing':0,'growth_rejected':0}
     for code in codes:
         current=Decimal(q[code]['price'])
         if code in saved and Decimal(saved[code])>0:
             change=current/Decimal(saved[code])-1;counts['cached']+=1
             keep=Decimal('.07')<=change<=Decimal('.10')
-        elif normal_week:
-            value=ranks[code].get('zdf_d5')
-            if value in (None,'','--'):counts['missing']+=1;result.append(code);continue
-            change=Decimal(str(value))/100;counts['bootstrap_5day']+=1
-            keep=Decimal('.06')<=change<=Decimal('.11')
         else:
             # 节假日周不可把5日涨幅冒充周涨幅；无缓存的个别标的回退精确历史。
             counts['missing']+=1;result.append(code);continue
