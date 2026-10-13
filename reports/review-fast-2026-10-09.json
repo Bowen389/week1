@@ -1,0 +1,56 @@
+{
+  "mode": "READ_ONLY_FAST_HISTORICAL_REVIEW",
+  "signal_date": "2026-10-09",
+  "prior_week_close_date": "2026-09-30",
+  "buy_date": "2026-10-12",
+  "due_date": "2026-10-26",
+  "mainboard_count": 3197,
+  "long_history_requests": 58,
+  "prefilter_counts": {
+    "市值超250亿": 537,
+    "周涨幅不符": 2457,
+    "ST": 145,
+    "周涨幅合格": 58
+  },
+  "rule_counts": {
+    "非严格光脚": 50,
+    "上影过长": 5,
+    "位置过高": 1,
+    "W1": 1,
+    "不足52根完整周线": 1
+  },
+  "signals": [
+    {
+      "code": "sh603665",
+      "name": "康隆达",
+      "metrics": {
+        "open": "23.330",
+        "high": "25.250",
+        "low": "23.330",
+        "close": "25.070",
+        "change": "0.073661670235546038543897216",
+        "level": "0.2370129870129870129870129870",
+        "shadow_ratio": "0.1034482758620689655172413793"
+      },
+      "cap_yi": "40.1540441449",
+      "buy_date": "2026-10-12",
+      "due_date": "2026-10-26",
+      "actual_open": "24.810",
+      "opening_buy_allowed": true,
+      "historical_valuation": {
+        "SECURITY_CODE": "603665",
+        "SECURITY_NAME_ABBR": "康隆达",
+        "TRADE_DATE": "2026-10-09 00:00:00",
+        "CLOSE_PRICE": 25.07,
+        "TOTAL_MARKET_CAP": 4015404414.49,
+        "TOTAL_SHARES": 160167707
+      }
+    }
+  ],
+  "errors": {},
+  "elapsed_seconds": 19.14,
+  "limitations": [
+    "简称采用带历史日期的估值记录，供应商可能回填简称；未独立取得历史ST状态",
+    "模拟仓不修改，历史买点不补买；开盘可成交性仅作日线保守模拟判断"
+  ]
+}
