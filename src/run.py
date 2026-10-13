@@ -174,11 +174,12 @@ def notify():
 def health():
     today=datetime.now(ZoneInfo('Asia/Shanghai')).date()
     sessions=data.calendar(today)
+    codes=data.universe()
     q=data.quotes(['sh000001','sz003001'])
     bars=data.history('sz003001')
     if len(bars)<250:raise data.DataError('腾讯历史覆盖不足')
     print(json.dumps({'calendar_end':str(sessions[-1]),'quote_date':q['sh000001']['timestamp'],
-                      'sample_name':q['sz003001']['name'],'daily_bars':len(bars),'latest_bar':bars[-1]['date']},ensure_ascii=False))
+                      'sample_name':q['sz003001']['name'],'mainboard_count':len(codes),'daily_bars':len(bars),'latest_bar':bars[-1]['date']},ensure_ascii=False))
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('command',choices=['run','notify','health'],default='run',nargs='?')

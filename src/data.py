@@ -30,6 +30,8 @@ def universe() -> list[str]:
         if total is None:total=reported
         if reported!=total:raise DataError('分页过程中股票总数变化')
         codes.extend(x['code'] for x in data['rank_list'])
+        if offset % 1000 == 0:
+            print(f'UNIVERSE_PROGRESS {len(codes)}/{total}',flush=True)
         if offset+200>=total:break
     unique=set(codes)
     if total is None or len(unique)!=total or total<4000:
