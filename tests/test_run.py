@@ -12,7 +12,7 @@ class Runner(unittest.TestCase):
             root=Path(tmp);state=root/'state.json';report=root/'latest.md'
             s=new_state();state.write_text(json.dumps(s))
             day=date(2026,1,9)
-            with patch.object(run,'STATE',state),patch.object(run,'REPORT',report),patch.object(run.data,'calendar',return_value=[day,date(2026,1,12)]),patch.object(run,'close_quotes',return_value={}),patch.object(run,'collect_signals',side_effect=run.data.DataError('下载失败')),patch.object(run,'summary'):
+            with patch.object(run,'STATE',state),patch.object(run,'REPORT',report),patch.object(run.data,'calendar',return_value=[day,date(2026,1,12)]),patch.object(run,'close_quotes',return_value={}),patch.object(run.data,'rank_snapshot',return_value={}),patch.object(run.data,'quotes',return_value={}),patch.object(run,'collect_signals',side_effect=run.data.DataError('下载失败')),patch.object(run,'summary'):
                 with self.assertRaises(run.data.DataError):run.run(datetime(2026,1,9,17,20,tzinfo=ZoneInfo('Asia/Shanghai')))
             after=json.loads(state.read_text());self.assertEqual(after['processed_days'],[]);self.assertEqual(after['cash'],'100000.00')
             self.assertIn('不能解释为无信号',report.read_text())

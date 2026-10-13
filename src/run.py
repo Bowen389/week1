@@ -6,7 +6,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
 from zoneinfo import ZoneInfo
-from . import data
+from . import data, market_cache
 from .strategy import new_state, signal, monday, next_session, execute_day, money
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -58,11 +58,14 @@ def close_quotes(codes,today):
             raise data.DataError(f'{code} 行情不是当日收盘: {stamp}')
     return q
 
-def collect_signals(state,today,sessions,messages):
+def collect_signals(state,today,sessions,messages,market=None):
     key=str(monday(today));buy=next_session(sessions,today)
     if key in state['scanned_weeks']:
         messages.append('本周已完整扫描，避免重复买点');return
-    codes=data.universe();q=data.quotes(codes);eligible=[];excluded=Counter()
+    if market is None:
+        ranks=data.rank_snapshot();q=data.quotes(sorted(ranks))
+    else:ranks,q=market
+    codes=sorted(ranks);eligible=[];excluded=Counter()
     for code in codes:
         item=q[code]
         if item['timestamp'][:8]!=today.strftime('%Y%m%d') or item['timestamp'][8:12]<'1500':
@@ -73,7 +76,10 @@ def collect_signals(state,today,sessions,messages):
         if not cap.is_finite() or cap<=0:raise data.DataError('总市值无效 '+code)
         if cap>250:excluded['总市值超250亿']+=1;continue
         eligible.append(code)
-    print(f'SCAN_START universe={len(codes)} eligible={len(eligible)} excluded={dict(excluded)}',flush=True)
+    before=len(eligible)
+    eligible,growth_counts=market_cache.price_candidates(eligible,q,ranks,today,sessions,state.setdefault('market_closes',{}))
+    messages.append(f'周涨幅前筛：市值/ST过滤后{before}只，需历史核验{len(eligible)}只；缓存统计{growth_counts}')
+    print(f'SCAN_START universe={len(codes)} eligible={len(eligible)} excluded={dict(excluded)} growth={growth_counts}',flush=True)
     histories,errors=data.histories(eligible)
     if errors:
         # 只要发生下载错误就拒绝发布“完整扫描”，不把接口失败说成无信号。
@@ -89,7 +95,7 @@ def collect_signals(state,today,sessions,messages):
             candidates.append(dict(code=code,name=q[code]['name'],signal_date=str(today),
                 buy_date=str(buy),cap_yi=q[code]['cap_yi'],metrics=metrics,status='PENDING'))
     state['scanned_weeks'][key]=dict(signal_date=str(today),buy_date=str(buy),
-        universe=len(codes),eligible=len(eligible),excluded=dict(excluded),reasons=dict(reasons),signals=candidates)
+        universe=len(codes),eligible=len(eligible),excluded=dict(excluded),growth_prefilter=growth_counts,reasons=dict(reasons),signals=candidates)
     for candidate in candidates:
         if candidate['code'] not in state['positions']:state['plans'].append(copy.deepcopy(candidate))
         else:messages.append('持仓期间忽略新信号 '+candidate['code'])
@@ -135,10 +141,13 @@ def run(now=None):
             atomic(REPORT,text);summary(text);return
         if now.hour<16:raise data.DataError('仅收盘后16:00起运行，禁止使用未结束日线')
         close_quotes(['sh000001'],today)  # 基准行情时间戳核对日期，防日历/免费接口过时。
+        # 每日缓存收盘，避免每周给所有股票重复下载长历史。
+        ranks=data.rank_snapshot();q=data.quotes(sorted(ranks))
+        market_cache.remember(working.setdefault('market_closes',{}),today,q)
         # 先模拟执行已有计划，随后才生成今天完整周的新计划。
         settle(working,today,sessions,messages)
         if monday(next_session(sessions,today))!=monday(today):
-            collect_signals(working,today,sessions,messages)
+            collect_signals(working,today,sessions,messages,market=(ranks,q))
         else:messages.append('本周尚未结束，等待本周最后交易日收盘生成W1')
         save(working)
         text=render(working,messages,'正常',today)
@@ -174,12 +183,11 @@ def notify():
 def health():
     today=datetime.now(ZoneInfo('Asia/Shanghai')).date()
     sessions=data.calendar(today)
-    codes=data.universe()
     q=data.quotes(['sh000001','sz003001'])
     bars=data.history('sz003001')
     if len(bars)<250:raise data.DataError('腾讯历史覆盖不足')
     print(json.dumps({'calendar_end':str(sessions[-1]),'quote_date':q['sh000001']['timestamp'],
-                      'sample_name':q['sz003001']['name'],'mainboard_count':len(codes),'daily_bars':len(bars),'latest_bar':bars[-1]['date']},ensure_ascii=False))
+                      'sample_name':q['sz003001']['name'],'daily_bars':len(bars),'latest_bar':bars[-1]['date']},ensure_ascii=False))
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('command',choices=['run','notify','health'],default='run',nargs='?')

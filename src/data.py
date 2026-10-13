@@ -19,43 +19,50 @@ def fetch(url: str, encoding='utf-8') -> str:
             error=exc;time.sleep(1+attempt)
     raise DataError(f'免费行情请求失败: {type(error).__name__}: {error}')
 
-def universe() -> list[str]:
-    codes=[];total=None
-    for offset in range(0,12000,200):
+def rank_snapshot() -> dict:
+    def page(offset):
         params=urllib.parse.urlencode(dict(_appver='11.17.0',board_code='aStock',
             sort_type='price',direct='down',offset=offset,count=200))
         payload=json.loads(fetch('https://proxy.finance.qq.com/cgi/cgi-bin/rank/hs/getBoardRankList?'+params))
         if payload.get('code')!=0:raise DataError('腾讯股票列表状态异常')
-        data=payload['data'];reported=int(data['total'])
-        if total is None:total=reported
-        if reported!=total:raise DataError('分页过程中股票总数变化')
-        codes.extend(x['code'] for x in data['rank_list'])
-        if offset % 1000 == 0:
-            print(f'UNIVERSE_PROGRESS {len(codes)}/{total}',flush=True)
-        if offset+200>=total:break
-    unique=set(codes)
-    if total is None or len(unique)!=total or total<4000:
-        raise DataError(f'股票列表不完整: {len(unique)}/{total}')
-    selected=sorted(c for c in unique if re.fullmatch(r'(sh|sz)\d{6}',c) and c[2:5] in PREFIXES)
+        return payload['data']
+    first=page(0);total=int(first['total'])
+    if total<4000 or total>12000:raise DataError('股票列表总数异常')
+    pages=[first]
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        for result in pool.map(page,range(200,total,200)):
+            if int(result['total'])!=total:raise DataError('分页过程中股票总数变化')
+            pages.append(result)
+    items=[row for result in pages for row in result['rank_list']]
+    rows={row['code']:row for row in items}
+    if len(rows)!=total:raise DataError(f'股票列表不完整: {len(rows)}/{total}')
+    selected={c:row for c,row in rows.items() if re.fullmatch(r'(sh|sz)\d{6}',c) and c[2:5] in PREFIXES}
     if len(selected)<2500:raise DataError('主板覆盖不足2500只')
-    return selected
+    print(f'UNIVERSE_COMPLETE total={total} mainboard={len(selected)}',flush=True)
+    return dict(sorted(selected.items()))
+
+def universe() -> list[str]:
+    return sorted(rank_snapshot())
 
 def quotes(codes: list[str]) -> dict:
-    result={}
-    for offset in range(0,len(codes),70):
-        text=fetch('https://qt.gtimg.cn/q='+','.join(codes[offset:offset+70]),'gb18030')
+    def batch(items):
+        result={}
+        text=fetch('https://qt.gtimg.cn/q='+','.join(items),'gb18030')
         for code,body in re.findall(r'v_((?:sh|sz)\d{6})="([^"]*)";',text):
             if not body:continue
             f=body.split('~')
             if len(f)<49:raise DataError('腾讯快照字段不完整 '+code)
-            try:
-                result[code]=dict(code=code,name=f[1].strip(),price=f[3],previous_close=f[4],
-                    open=f[5],volume=f[6],timestamp=f[30],high=f[33],low=f[34],
-                    cap_yi=f[45],upper=f[47],lower=f[48])
-                if len(f[30])!=14:raise ValueError('时间戳长度错误')
-            except (ValueError,IndexError) as exc:raise DataError(f'{code} 快照错误: {exc}')
-    missing=set(codes)-set(result)
-    if missing:raise DataError(f'快照缺失{len(missing)}只，示例{sorted(missing)[:5]}')
+            result[code]=dict(code=code,name=f[1].strip(),price=f[3],previous_close=f[4],
+                open=f[5],volume=f[6],timestamp=f[30],high=f[33],low=f[34],
+                cap_yi=f[45],upper=f[47],lower=f[48])
+            if len(f[30])!=14:raise DataError('时间戳长度错误 '+code)
+        missing=set(items)-set(result)
+        if missing:raise DataError(f'快照缺失{len(missing)}只，示例{sorted(missing)[:5]}')
+        return result
+    result={}
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        for block in pool.map(batch,[codes[i:i+70] for i in range(0,len(codes),70)]):
+            result.update(block)
     return result
 
 def history(code: str, count=400) -> list[dict]:

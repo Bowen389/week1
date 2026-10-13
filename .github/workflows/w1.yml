@@ -11,7 +11,7 @@ on:
 permissions:
   contents: write
 concurrency:
-  group: w1-paper-ledger
+  group: w1-paper-only
   cancel-in-progress: false
 jobs:
   daily:
