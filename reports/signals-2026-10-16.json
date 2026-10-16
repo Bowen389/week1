@@ -1,0 +1,22 @@
+{
+  "signal_date": "2026-10-16",
+  "buy_date": "2026-10-19",
+  "universe": 3197,
+  "eligible": 24,
+  "excluded": {
+    "总市值超250亿": 513,
+    "ST": 145
+  },
+  "growth_prefilter": {
+    "cached": 2539,
+    "missing": 0,
+    "growth_rejected": 2515
+  },
+  "reasons": {
+    "非严格光脚": 21,
+    "上影过长": 1,
+    "非阳线": 1,
+    "不足52根完整周线": 1
+  },
+  "signals": []
+}
