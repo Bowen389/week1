@@ -1,0 +1,40 @@
+{
+  "signal_date": "2026-10-23",
+  "buy_date": "2026-10-26",
+  "universe": 3194,
+  "eligible": 70,
+  "excluded": {
+    "总市值超250亿": 511,
+    "ST": 141
+  },
+  "growth_prefilter": {
+    "cached": 2542,
+    "missing": 0,
+    "growth_rejected": 2472
+  },
+  "reasons": {
+    "非严格光脚": 66,
+    "不足52根完整周线": 2,
+    "W1": 1,
+    "无上影": 1
+  },
+  "signals": [
+    {
+      "code": "sz002180",
+      "name": "奔图科技",
+      "signal_date": "2026-10-23",
+      "buy_date": "2026-10-26",
+      "cap_yi": "234.47",
+      "metrics": {
+        "open": "15.150",
+        "high": "16.66",
+        "low": "15.150",
+        "close": "16.49",
+        "change": "0.077073807968647942521227956",
+        "level": "0.3101343101343101343101343101",
+        "shadow_ratio": "0.1268656716417910447761194030"
+      },
+      "status": "PENDING"
+    }
+  ]
+}
