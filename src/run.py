@@ -144,7 +144,10 @@ def run(now=None):
         if today not in sessions:
             text=render(state,['今日非交易日，不扫描、不记成交'],'休市',today)
             atomic(REPORT,text);summary(text);return
-        if now.hour<16:raise data.DataError('仅收盘后16:00起运行，禁止使用未结束日线')
+        if now.hour<16:
+            # Actions定时可能延迟到次日；正常跳过，不生成错误推送或覆盖盘后报告。
+            summary(f'W1_SKIP_BEFORE_CLOSE: {now.isoformat()}；等待北京时间16:00后运行，账本及最近盘后报告保持不变')
+            return
         close_quotes(['sh000001'],today)  # 基准行情时间戳核对日期，防日历/免费接口过时。
         # 每日缓存收盘，避免每周给所有股票重复下载长历史。
         ranks=data.rank_snapshot();q=data.quotes(sorted(ranks))

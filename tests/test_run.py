@@ -21,9 +21,15 @@ class Runner(unittest.TestCase):
         with patch.object(run.data,'universe',side_effect=AssertionError('不应再次下载')):
             run.collect_signals(s,date(2026,1,9),[date(2026,1,12)],messages)
         self.assertFalse(s['plans'])
-    def test_before_close_refuses_data(self):
+    def test_delayed_run_before_close_skips_without_mutation(self):
         with tempfile.TemporaryDirectory() as tmp:
             state=Path(tmp)/'state.json';report=Path(tmp)/'report.md'
             with patch.object(run,'STATE',state),patch.object(run,'REPORT',report),patch.object(run.data,'calendar',return_value=[date(2026,1,9)]),patch.object(run,'summary'):
-                with self.assertRaises(run.data.DataError):run.run(datetime(2026,1,9,14,tzinfo=ZoneInfo('Asia/Shanghai')))
-                self.assertFalse(json.loads(state.read_text())['processed_days'])
+                state.write_text(json.dumps(new_state()))
+                report.write_text('previous completed report')
+                original=state.read_text()
+                for hour in (0,2,14,15):
+                    with patch.object(run,'close_quotes',side_effect=AssertionError('盘前不得查询收盘行情')):
+                        run.run(datetime(2026,1,9,hour,tzinfo=ZoneInfo('Asia/Shanghai')))
+                    self.assertEqual(state.read_text(),original)
+                    self.assertEqual(report.read_text(),'previous completed report')
