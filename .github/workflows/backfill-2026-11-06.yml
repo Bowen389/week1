@@ -1,0 +1,27 @@
+name: Backfill candidates for 2026-11-06
+on:
+  push:
+    branches: [backfill-2026-11-06]
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - name: Scan Friday candidates
+        run: |
+          python -u -m src.review_fast --date 2026-11-06
+      - name: Print scan report
+        if: always()
+        run: cat reports/review-fast-2026-11-06.md
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: candidates-2026-11-06
+          path: reports/review-fast-2026-11-06.*
