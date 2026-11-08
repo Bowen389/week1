@@ -70,6 +70,8 @@ def collect_signals(state,today,sessions,messages,market=None):
         item=q[code]
         if item['timestamp'][:8]!=today.strftime('%Y%m%d') or item['timestamp'][8:12]<'1500':
             excluded['当日停牌或行情过时']+=1;continue
+        if Decimal(item['volume']) == 0:
+            excluded['当日零成交']+=1;continue
         if not item['name']:raise data.DataError('股票简称为空 '+code)
         if item['name'].upper().startswith(('ST','*ST')):excluded['ST']+=1;continue
         cap=Decimal(item['cap_yi'])
@@ -91,8 +93,14 @@ def collect_signals(state,today,sessions,messages,market=None):
         raise data.DataError(f'周扫描未完成: 成功{len(histories)}/{len(eligible)}; 失败示例{list(errors.items())[:8]}')
     candidates=[];reasons=Counter()
     for code in eligible:
-        bars=histories[code]
-        if bars and bars[-1]['date']!=str(today):raise data.DataError('日线未更新 '+code)
+        bars=[bar for bar in histories[code] if bar['date']<=str(today)]
+        if bars and bars[-1]['date']<str(today):
+            # 当日快照已经过日期和收盘时点校验，日线接口未补齐时复用其收盘 OHLC。
+            quote=q[code]
+            o,h,l,c,v=(Decimal(quote[key]) for key in ('open','high','low','price','volume'))
+            if not all(x.is_finite() and x>0 for x in (o,h,l,c,v)) or l>min(o,c) or h<max(o,c):
+                raise data.DataError('日线未更新且收盘快照无效 '+code)
+            bars.append(dict(date=str(today),open=str(o),high=str(h),low=str(l),close=str(c),volume=str(v)))
         if bars and abs(Decimal(bars[-1]['close'])-Decimal(q[code]['price']))>Decimal('.01'):
             raise data.DataError('日线收盘与快照不一致 '+code)
         ok,reason,metrics=signal(bars,today);reasons[reason]+=1
