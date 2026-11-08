@@ -191,7 +191,6 @@ def notify():
         print('NOTIFY_NOT_CONFIGURED: 买点可见于reports/latest.md和Actions摘要；配置SERVERCHAN_SENDKEY开启推送')
         return
     if not all(c.isalnum() or c in '_-' for c in sendkey):raise ValueError('Server酱SendKey格式异常')
-    changed=False
     for event in state['outbox']:
         if event['sent']:continue
         # 网络边界只能做到重试时可能重复，不能承诺外部消息exactly-once。
@@ -202,8 +201,9 @@ def notify():
             if result.get('code')!=0:raise RuntimeError('Server酱返回失败状态')
         except Exception:
             raise RuntimeError('Server酱发送失败（密钥及响应不输出）') from None
-        event['sent']=True;changed=True
-    if changed:save(state)
+        event['sent']=True
+        save(state)
+        print(f"NOTIFY_SENT {event['id']}",flush=True)
 
 def health():
     today=datetime.now(ZoneInfo('Asia/Shanghai')).date()
