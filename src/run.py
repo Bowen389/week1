@@ -141,13 +141,22 @@ def run(now=None):
     state=load();working=copy.deepcopy(state);messages=[]
     try:
         sessions=data.calendar(today)
-        if today not in sessions:
-            text=render(state,['今日非交易日，不扫描、不记成交'],'休市',today)
-            atomic(REPORT,text);summary(text);return
-        if now.hour<16:
-            # Actions定时可能延迟到次日；正常跳过，不生成错误推送或覆盖盘后报告。
-            summary(f'W1_SKIP_BEFORE_CLOSE: {now.isoformat()}；等待北京时间16:00后运行，账本及最近盘后报告保持不变')
-            return
+        if today not in sessions or now.hour < 16:
+            # 盘中快照已滚到当天，只有开盘集合竞价前或休市时才能核验上一交易日。
+            if today in sessions and (now.hour, now.minute) >= (9, 15):
+                summary(f'W1_SKIP_BEFORE_CLOSE: {now.isoformat()}')
+                return
+            previous = max((day for day in sessions if day < today), default=None)
+            if previous is None:
+                summary(f'W1_NO_CLOSED_SESSION: {now.isoformat()}')
+                return
+            week_end = monday(next_session(sessions, previous)) != monday(previous)
+            week_pending = week_end and str(monday(previous)) not in state['scanned_weeks']
+            if str(previous) in state['processed_days'] and not week_pending:
+                summary(f'W1_ALREADY_PROCESSED: {previous}')
+                return
+            today = previous
+            messages.append(f'延迟补跑：按上一已收盘交易日 {today} 执行')
         close_quotes(['sh000001'],today)  # 基准行情时间戳核对日期，防日历/免费接口过时。
         # 每日缓存收盘，避免每周给所有股票重复下载长历史。
         ranks=data.rank_snapshot();q=data.quotes(sorted(ranks))
