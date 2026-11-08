@@ -33,3 +33,20 @@ class Runner(unittest.TestCase):
                         run.run(datetime(2026,1,9,hour,tzinfo=ZoneInfo('Asia/Shanghai')))
                     self.assertEqual(state.read_text(),original)
                     self.assertEqual(report.read_text(),'previous completed report')
+
+    def test_saturday_recovers_friday_once(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state=Path(tmp)/'state.json';report=Path(tmp)/'report.md'
+            friday=date(2026,1,9);monday=date(2026,1,12)
+            state.write_text(json.dumps(new_state()))
+
+            def scan(working, day, sessions, messages, market):
+                working['scanned_weeks']['2026-01-05']={'signals': []}
+
+            with patch.object(run,'STATE',state),patch.object(run,'REPORT',report),patch.object(run.data,'calendar',return_value=[friday,monday]),patch.object(run,'close_quotes',return_value={}) as quotes,patch.object(run.data,'rank_snapshot',return_value={}),patch.object(run.data,'quotes',return_value={}),patch.object(run,'collect_signals',side_effect=scan) as collect,patch.object(run,'summary'):
+                delayed=datetime(2026,1,10,2,0,tzinfo=ZoneInfo('Asia/Shanghai'))
+                run.run(delayed)
+                run.run(delayed)
+                quotes.assert_called_once_with(['sh000001'],friday)
+                collect.assert_called_once()
+            self.assertIn('日期：2026-01-09',report.read_text())
